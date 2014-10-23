@@ -602,8 +602,8 @@ protected:
       // Example error handling.
       if (args[i] == "-an-error") {
         DiagnosticsEngine &D = CI.getDiagnostics();
-        unsigned DiagID = D.getCustomDiagID(
-          DiagnosticsEngine::Error, "invalid argument '" + args[i] + "'");
+        unsigned DiagID = D.getDiagnosticIDs()->getCustomDiagID((DiagnosticIDs::Level)
+          DiagnosticsEngine::Error, StringRef("invalid argument '" + args[i] + "'"));
         D.Report(DiagID);
         return false;
       }
