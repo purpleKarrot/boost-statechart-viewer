@@ -35,31 +35,27 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 
-using namespace clang;
-using namespace std;
-
 namespace Model
 {
 
 inline int getIndentLevelIdx()
 {
-	static int i = ios_base::xalloc();
+	static int i = std::ios_base::xalloc();
 	return i;
 }
 
-ostream& indent(ostream& os)
+std::ostream& indent(std::ostream& os)
 {
-	os << setw(2 * os.iword(getIndentLevelIdx())) << "";
-	return os;
+	return os << std::setw(2 * os.iword(getIndentLevelIdx())) << "";
 }
 
-ostream& indent_inc(ostream& os)
+std::ostream& indent_inc(std::ostream& os)
 {
 	++os.iword(getIndentLevelIdx());
 	return os;
 }
 
-ostream& indent_dec(ostream& os)
+std::ostream& indent_dec(std::ostream& os)
 {
 	--os.iword(getIndentLevelIdx());
 	return os;
@@ -67,39 +63,39 @@ ostream& indent_dec(ostream& os)
 
 class State;
 
-class Context: public map<string, State*>
+class Context: public std::map<std::string, State*>
 {
 public:
 	iterator add(State *state);
-	Context *findContext(const string &name);
+	Context *findContext(const std::string &name);
 };
 
 class State: public Context
 {
-	string initialInnerState;
-	list<string> defferedEvents;
-	list<string> inStateEvents;
+	std::string initialInnerState;
+	std::list<std::string> defferedEvents;
+	std::list<std::string> inStateEvents;
 	bool noTypedef;
 
 public:
-	const string name;
+	const std::string name;
 
-	explicit State(string name) :
+	explicit State(std::string name) :
 			noTypedef(false), name(std::move(name))
 	{
 	}
 
-	void setInitialInnerState(string name)
+	void setInitialInnerState(std::string name)
 	{
 		initialInnerState = name;
 	}
 
-	void addDeferredEvent(const string &name)
+	void addDeferredEvent(const std::string &name)
 	{
 		defferedEvents.push_back(name);
 	}
 
-	void addInStateEvent(const string &name)
+	void addInStateEvent(const std::string &name)
 	{
 		inStateEvents.push_back(name);
 	}
@@ -109,24 +105,23 @@ public:
 		noTypedef = true;
 	}
 
-	friend ostream& operator<<(ostream& os, const State& s);
+	friend std::ostream& operator<<(std::ostream& os, const State& s);
 };
 
 Context::iterator Context::add(State *state)
 {
-	pair<iterator, bool> ret = insert(value_type(state->name, state));
-	return ret.first;
+	return insert(value_type(state->name, state)).first;
 }
 
-Context *Context::findContext(const string &name)
+Context *Context::findContext(const std::string &name)
 {
 	iterator i = find(name), e;
 	if (i != end())
 		return i->second;
 
-	for (i = begin(), e = end(); i != e; ++i)
+	for (auto & elem : *this)
 	{
-		Context *c = i->second->findContext(name);
+		Context *c = elem.second->findContext(name);
 		if (c)
 			return c;
 	}
@@ -134,11 +129,11 @@ Context *Context::findContext(const string &name)
 	return nullptr;
 }
 
-ostream& operator<<(ostream& os, const Context& c);
+std::ostream& operator<<(std::ostream& os, const Context& c);
 
-ostream& operator<<(ostream& os, const State& s)
+std::ostream& operator<<(std::ostream& os, const State& s)
 {
-	string label = s.name;
+	std::string label = s.name;
 
 	for (const auto & elem : s.defferedEvents)
 		label.append("<br />").append(elem).append(" / defer");
@@ -164,7 +159,7 @@ ostream& operator<<(ostream& os, const State& s)
 	return os;
 }
 
-ostream& operator<<(ostream& os, const Context& c)
+std::ostream& operator<<(std::ostream& os, const Context& c)
 {
 	for (const auto & elem : c)
 	{
@@ -177,15 +172,15 @@ ostream& operator<<(ostream& os, const Context& c)
 class Transition
 {
 public:
-	const string src, dst, event;
+	const std::string src, dst, event;
 
-	Transition(string src, string dst, string event) :
+	Transition(std::string src, std::string dst, std::string event) :
 			src(std::move(src)), dst(std::move(dst)), event(std::move(event))
 	{
 	}
 };
 
-ostream& operator<<(ostream& os, const Transition& t)
+std::ostream& operator<<(std::ostream& os, const Transition& t)
 {
 	os << indent << t.src << " -> " << t.dst << " [label = \"" << t.event << "\"]\n";
 	return os;
@@ -194,25 +189,25 @@ ostream& operator<<(ostream& os, const Transition& t)
 class Machine: public Context
 {
 protected:
-	string initial_state;
+	std::string initial_state;
 
 public:
-	const string name;
+	const std::string name;
 
-	explicit Machine(string name) :
+	explicit Machine(std::string name) :
 			name(std::move(name))
 	{
 	}
 
-	void setInitialState(string name)
+	void setInitialState(std::string name)
 	{
 		initial_state = name;
 	}
 
-	friend ostream& operator<<(ostream& os, const Machine& m);
+	friend std::ostream& operator<<(std::ostream& os, const Machine& m);
 };
 
-ostream& operator<<(ostream& os, const Machine& m)
+std::ostream& operator<<(std::ostream& os, const Machine& m)
 {
 	os << indent << "subgraph " << m.name << " {\n" << indent_inc;
 	os << indent << m.initial_state << " [peripheries=2]\n";
@@ -221,17 +216,16 @@ ostream& operator<<(ostream& os, const Machine& m)
 	return os;
 }
 
-class Model: public map<string, Machine>
+class Model: public std::map<std::string, Machine>
 {
 	Context undefined;	// For forward-declared state classes
 
 public:
-	list<Transition*> transitions;
+	std::list<Transition*> transitions;
 
 	iterator add(const Machine &m)
 	{
-		pair<iterator, bool> ret = insert(value_type(m.name, m));
-		return ret.first;
+		return insert(value_type(m.name, m)).first;
 	}
 
 	void addUndefinedState(State *m)
@@ -239,7 +233,7 @@ public:
 		undefined[m->name] = m;
 	}
 
-	Context *findContext(const string &name)
+	Context *findContext(const std::string &name)
 	{
 		auto ci = undefined.find(name);
 		if (ci != undefined.end())
@@ -249,9 +243,9 @@ public:
 		if (i != end())
 			return &i->second;
 
-		for (i = begin(), e = end(); i != e; ++i)
+		for (auto & elem : *this)
 		{
-			Context *c = i->second.findContext(name);
+			Context *c = elem.second.findContext(name);
 			if (c)
 				return c;
 		}
@@ -259,7 +253,7 @@ public:
 		return nullptr;
 	}
 
-	State *findState(const string &name)
+	State *findState(const std::string &name)
 	{
 		for (auto & elem : *this)
 		{
@@ -271,7 +265,7 @@ public:
 		return nullptr;
 	}
 
-	State *removeFromUndefinedContexts(const string &name)
+	State *removeFromUndefinedContexts(const std::string &name)
 	{
 		auto ci = undefined.find(name);
 		if (ci == undefined.end())
@@ -280,9 +274,9 @@ public:
 		return ci->second;
 	}
 
-	void write_as_dot_file(string fn)
+	void write_as_dot_file(std::string fn)
 	{
-		ofstream f(fn.c_str());
+		std::ofstream f(fn.c_str());
 		f << "digraph statecharts {\n" << indent_inc;
 		for (auto & elem : *this)
 			f << elem.second;
@@ -294,21 +288,21 @@ public:
 
 } // namespace Model
 
-class MyCXXRecordDecl: public CXXRecordDecl
+class MyCXXRecordDecl: public clang::CXXRecordDecl
 {
-	static bool FindBaseClassString(const CXXBaseSpecifier *Specifier, CXXBasePath &Path, void *qualName)
+	static bool FindBaseClassString(const clang::CXXBaseSpecifier *Specifier, clang::CXXBasePath &Path, void *qualName)
 	{
-		string qn(static_cast<const char*>(qualName));
-		const RecordType *rt = Specifier->getType()->getAs<RecordType>();
+		std::string qn(static_cast<const char*>(qualName));
+		const clang::RecordType *rt = Specifier->getType()->getAs<clang::RecordType>();
 		assert(rt);
 		TagDecl *canon = rt->getDecl()->getCanonicalDecl();
 		return canon->getQualifiedNameAsString() == qn;
 	}
 
 public:
-	bool isDerivedFrom(const char *baseStr, CXXBaseSpecifier const **Base = nullptr) const
+	bool isDerivedFrom(const char *baseStr, clang::CXXBaseSpecifier const **Base = nullptr) const
 	{
-		CXXBasePaths Paths(/*FindAmbiguities=*/false, /*RecordPaths=*/!!Base, /*DetectVirtual=*/false);
+		clang::CXXBasePaths Paths(/*FindAmbiguities=*/false, /*RecordPaths=*/!!Base, /*DetectVirtual=*/false);
 		Paths.setOrigin(const_cast<MyCXXRecordDecl*>(this));
 		if (!lookupInBases(&FindBaseClassString, const_cast<char*>(baseStr), Paths))
 			return false;
@@ -318,23 +312,23 @@ public:
 	}
 };
 
-class FindTransitVisitor: public RecursiveASTVisitor<FindTransitVisitor>
+class FindTransitVisitor: public clang::RecursiveASTVisitor<FindTransitVisitor>
 {
 	Model::Model &model;
-	const CXXRecordDecl *SrcState;
-	const Type *EventType;
+	const clang::CXXRecordDecl *SrcState;
+	const clang::Type *EventType;
 
 public:
-	explicit FindTransitVisitor(Model::Model &model, const CXXRecordDecl *SrcState, const Type *EventType) :
+	explicit FindTransitVisitor(Model::Model &model, const clang::CXXRecordDecl *SrcState, const clang::Type *EventType) :
 			model(model), SrcState(SrcState), EventType(EventType)
 	{
 	}
 
-	bool VisitMemberExpr(MemberExpr *E)
+	bool VisitMemberExpr(clang::MemberExpr *E)
 	{
 		if (E->getMemberNameInfo().getAsString() == "defer_event")
 		{
-			CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
+			clang::CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
 
 			Model::State *s = model.findState(SrcState->getName());
 			assert(s);
@@ -345,9 +339,9 @@ public:
 
 		if (E->hasExplicitTemplateArgs())
 		{
-			const Type *DstStateType = E->getExplicitTemplateArgs()[0].getArgument().getAsType().getTypePtr();
-			CXXRecordDecl *DstState = DstStateType->getAsCXXRecordDecl();
-			CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
+			const clang::Type *DstStateType = E->getExplicitTemplateArgs()[0].getArgument().getAsType().getTypePtr();
+			clang::CXXRecordDecl *DstState = DstStateType->getAsCXXRecordDecl();
+			clang::CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
 			Model::Transition *T = new Model::Transition(SrcState->getName(), DstState->getName(), Event->getName());
 			model.transitions.push_back(T);
 		}
@@ -356,14 +350,14 @@ public:
 	}
 };
 
-class Visitor: public RecursiveASTVisitor<Visitor>
+class Visitor: public clang::RecursiveASTVisitor<Visitor>
 {
 	struct eventModel
 	{
-		string name;
-		SourceLocation loc;
+		std::string name;
+		clang::SourceLocation loc;
 
-		eventModel(string ev, SourceLocation sourceLoc) :
+		eventModel(std::string ev, clang::SourceLocation sourceLoc) :
 				name(std::move(ev)), loc(std::move(sourceLoc))
 		{
 		}
@@ -371,9 +365,9 @@ class Visitor: public RecursiveASTVisitor<Visitor>
 
 	struct eventHasName
 	{
-		string eventName;
+		std::string eventName;
 
-		eventHasName(string name) :
+		eventHasName(std::string name) :
 				eventName(std::move(name))
 		{
 		}
@@ -384,9 +378,9 @@ class Visitor: public RecursiveASTVisitor<Visitor>
 		}
 	};
 
-	ASTContext *ASTCtx;
+	clang::ASTContext *ASTCtx;
 	Model::Model &model;
-	DiagnosticsEngine &Diags;
+	clang::DiagnosticsEngine &Diags;
 	unsigned diag_unhandled_reaction_type, diag_unhandled_reaction_decl, diag_found_state, diag_found_statemachine, diag_no_history, diag_missing_reaction, diag_warning;
 	std::vector<bool> reactMethodInReactions; // Indicates whether i-th react method is referenced from typedef reactions.
 	std::list<eventModel> unusedEvents;
@@ -397,61 +391,59 @@ public:
 		return true;
 	}
 
-	explicit Visitor(ASTContext *Context, Model::Model &model, DiagnosticsEngine &Diags) :
+	explicit Visitor(clang::ASTContext *Context, Model::Model &model, clang::DiagnosticsEngine &Diags) :
 			ASTCtx(Context), model(model), Diags(Diags)
 	{
-		diag_found_statemachine = Diags.getCustomDiagID(DiagnosticsEngine::Note, "Found statemachine '%0'");
-		diag_found_state = Diags.getCustomDiagID(DiagnosticsEngine::Note, "Found state '%0'");
-		diag_unhandled_reaction_type = Diags.getCustomDiagID(DiagnosticsEngine::Error, "Unhandled reaction type '%0'");
-		diag_unhandled_reaction_decl = Diags.getCustomDiagID(DiagnosticsEngine::Error, "Unhandled reaction decl '%0'");
-		diag_no_history = Diags.getCustomDiagID(DiagnosticsEngine::Error, "History is not yet supported");
-		diag_missing_reaction = Diags.getCustomDiagID(DiagnosticsEngine::Error, "Missing react method for event '%0'");
-		diag_warning = Diags.getCustomDiagID(DiagnosticsEngine::Warning, "'%0' %1");
+		diag_found_statemachine = Diags.getCustomDiagID(clang::DiagnosticsEngine::Note, "Found statemachine '%0'");
+		diag_found_state = Diags.getCustomDiagID(clang::DiagnosticsEngine::Note, "Found state '%0'");
+		diag_unhandled_reaction_type = Diags.getCustomDiagID(clang::DiagnosticsEngine::Error, "Unhandled reaction type '%0'");
+		diag_unhandled_reaction_decl = Diags.getCustomDiagID(clang::DiagnosticsEngine::Error, "Unhandled reaction decl '%0'");
+		diag_no_history = Diags.getCustomDiagID(clang::DiagnosticsEngine::Error, "History is not yet supported");
+		diag_missing_reaction = Diags.getCustomDiagID(clang::DiagnosticsEngine::Error, "Missing react method for event '%0'");
+		diag_warning = Diags.getCustomDiagID(clang::DiagnosticsEngine::Warning, "'%0' %1");
 	}
 
-	DiagnosticBuilder Diag(SourceLocation Loc, unsigned DiagID)
+	clang::DiagnosticBuilder Diag(clang::SourceLocation Loc, unsigned DiagID)
 	{
 		return Diags.Report(Loc, DiagID);
 	}
 
-	void checkAllReactMethods(const CXXRecordDecl *SrcState)
+	void checkAllReactMethods(const clang::CXXRecordDecl *SrcState)
 	{
 		unsigned i = 0;
-		IdentifierInfo& II = ASTCtx->Idents.get("react");
-		DeclContext::lookup_const_result ReactRes = SrcState->lookup(DeclarationName(&II));
-		DeclContext::lookup_const_result::iterator it, end;
+		clang::IdentifierInfo& II = ASTCtx->Idents.get("react");
+		clang::DeclContext::lookup_const_result ReactRes = SrcState->lookup(clang::DeclarationName(&II));
 
-		for (it = ReactRes.begin(), end = ReactRes.end(); it != end; ++it, ++i)
+		for (clang::DeclContext::lookup_const_result::iterator it = ReactRes.begin(), end = ReactRes.end(); it != end; ++it, ++i)
 		{
 			if (i >= reactMethodInReactions.size() || reactMethodInReactions[i] == false)
 			{
-				CXXMethodDecl *React = dyn_cast<CXXMethodDecl>(*it);
+				clang::CXXMethodDecl *React = clang::dyn_cast<clang::CXXMethodDecl>(*it);
 				Diag(React->getParamDecl(0)->getLocStart(), diag_warning) << React->getParamDecl(0)->getType().getAsString() << " missing in typedef reactions";
 			}
 		}
 	}
 
-	bool HandleCustomReaction(const CXXRecordDecl *SrcState, const Type *EventType)
+	bool HandleCustomReaction(const clang::CXXRecordDecl *SrcState, const clang::Type *EventType)
 	{
 		unsigned i = 0;
-		IdentifierInfo& II = ASTCtx->Idents.get("react");
+		clang::IdentifierInfo& II = ASTCtx->Idents.get("react");
 		// TODO: Lookup for react even in base classes - probably by using Sema::LookupQualifiedName()
-		DeclContext::lookup_const_result ReactRes = SrcState->lookup(DeclarationName(&II));
-		DeclContext::lookup_const_result::iterator it, end;
+		clang::DeclContext::lookup_const_result ReactRes = SrcState->lookup(clang::DeclarationName(&II));
 
-		for (it = ReactRes.begin(), end = ReactRes.end(); it != end; ++it)
+		for (auto & ReactRe : ReactRes)
 		{
-			if (CXXMethodDecl *React = dyn_cast<CXXMethodDecl>(*it))
+			if (clang::CXXMethodDecl *React = clang::dyn_cast<clang::CXXMethodDecl>(ReactRe))
 			{
 				if (React->getNumParams() >= 1)
 				{
-					const ParmVarDecl *p = React->getParamDecl(0);
-					const Type *ParmType = p->getType().getTypePtr();
+					const clang::ParmVarDecl *p = React->getParamDecl(0);
+					const clang::Type *ParmType = p->getType().getTypePtr();
 					if (i == reactMethodInReactions.size())
 						reactMethodInReactions.push_back(false);
 
 					if (ParmType->isLValueReferenceType())
-						ParmType = dyn_cast<LValueReferenceType>(ParmType)->getPointeeType().getTypePtr();
+						ParmType = clang::dyn_cast<clang::LValueReferenceType>(ParmType)->getPointeeType().getTypePtr();
 
 					if (ParmType == EventType)
 					{
@@ -464,7 +456,7 @@ public:
 					Diag(React->getLocStart(), diag_warning) << React << "has not a parameter";
 			}
 			else
-				Diag((*it)->getSourceRange().getBegin(), diag_warning) << (*it)->getDeclKindName() << "is not supported as react method";
+				Diag((ReactRe)->getSourceRange().getBegin(), diag_warning) << (ReactRe)->getDeclKindName() << "is not supported as react method";
 
 			i++;
 		}
@@ -472,20 +464,20 @@ public:
 		return false;
 	}
 
-	void HandleReaction(const Type *T, const SourceLocation Loc, CXXRecordDecl *SrcState)
+	void HandleReaction(const clang::Type *T, const clang::SourceLocation Loc, clang::CXXRecordDecl *SrcState)
 	{
 		// TODO: Improve Loc tracking
-		if (const ElaboratedType *ET = dyn_cast<ElaboratedType>(T))
+		if (const clang::ElaboratedType *ET = clang::dyn_cast<clang::ElaboratedType>(T))
 			HandleReaction(ET->getNamedType().getTypePtr(), Loc, SrcState);
-		else if (const TemplateSpecializationType *TST = dyn_cast<TemplateSpecializationType>(T))
+		else if (const clang::TemplateSpecializationType *TST = clang::dyn_cast<clang::TemplateSpecializationType>(T))
 		{
-			string name = TST->getTemplateName().getAsTemplateDecl()->getQualifiedNameAsString();
+			std::string name = TST->getTemplateName().getAsTemplateDecl()->getQualifiedNameAsString();
 			if (name == "boost::statechart::transition")
 			{
-				const Type *EventType = TST->getArg(0).getAsType().getTypePtr();
-				const Type *DstStateType = TST->getArg(1).getAsType().getTypePtr();
-				CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
-				CXXRecordDecl *DstState = DstStateType->getAsCXXRecordDecl();
+				const clang::Type *EventType = TST->getArg(0).getAsType().getTypePtr();
+				const clang::Type *DstStateType = TST->getArg(1).getAsType().getTypePtr();
+				clang::CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
+				clang::CXXRecordDecl *DstState = DstStateType->getAsCXXRecordDecl();
 				unusedEvents.remove_if(eventHasName(Event->getNameAsString()));
 
 				Model::Transition *T = new Model::Transition(SrcState->getName(), DstState->getName(), Event->getName());
@@ -493,7 +485,7 @@ public:
 			}
 			else if (name == "boost::statechart::custom_reaction")
 			{
-				const Type *EventType = TST->getArg(0).getAsType().getTypePtr();
+				const clang::Type *EventType = TST->getArg(0).getAsType().getTypePtr();
 				if (!HandleCustomReaction(SrcState, EventType))
 				{
 					Diag(SrcState->getLocation(), diag_missing_reaction) << EventType->getAsCXXRecordDecl()->getName();
@@ -502,8 +494,8 @@ public:
 			}
 			else if (name == "boost::statechart::deferral")
 			{
-				const Type *EventType = TST->getArg(0).getAsType().getTypePtr();
-				CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
+				const clang::Type *EventType = TST->getArg(0).getAsType().getTypePtr();
+				clang::CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
 				unusedEvents.remove_if(eventHasName(Event->getNameAsString()));
 
 				Model::State *s = model.findState(SrcState->getName());
@@ -517,8 +509,8 @@ public:
 			}
 			else if (name == "boost::statechart::in_state_reaction")
 			{
-				const Type *EventType = TST->getArg(0).getAsType().getTypePtr();
-				CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
+				const clang::Type *EventType = TST->getArg(0).getAsType().getTypePtr();
+				clang::CXXRecordDecl *Event = EventType->getAsCXXRecordDecl();
 				unusedEvents.remove_if(eventHasName(Event->getNameAsString()));
 
 				Model::State *s = model.findState(SrcState->getName());
@@ -533,20 +525,20 @@ public:
 			Diag(Loc, diag_unhandled_reaction_type) << T->getTypeClassName();
 	}
 
-	void HandleReaction(const NamedDecl *Decl, CXXRecordDecl *SrcState)
+	void HandleReaction(const clang::NamedDecl *Decl, clang::CXXRecordDecl *SrcState)
 	{
-		if (const TypedefDecl *r = dyn_cast<TypedefDecl>(Decl))
+		if (const clang::TypedefDecl *r = clang::dyn_cast<clang::TypedefDecl>(Decl))
 			HandleReaction(r->getCanonicalDecl()->getUnderlyingType().getTypePtr(), r->getLocStart(), SrcState);
 		else
 			Diag(Decl->getLocation(), diag_unhandled_reaction_decl) << Decl->getDeclKindName();
 		checkAllReactMethods(SrcState);
 	}
 
-	TemplateArgumentLoc getTemplateArgLoc(const TypeLoc &T, unsigned ArgNum, bool ignore)
+	clang::TemplateArgumentLoc getTemplateArgLoc(const clang::TypeLoc &T, unsigned ArgNum, bool ignore)
 	{
-		if (const ElaboratedTypeLoc ET = T.getAs<ElaboratedTypeLoc>())
+		if (const clang::ElaboratedTypeLoc ET = T.getAs<clang::ElaboratedTypeLoc>())
 			return getTemplateArgLoc(ET.getNamedTypeLoc(), ArgNum, ignore);
-		else if (const TemplateSpecializationTypeLoc TST = T.getAs<TemplateSpecializationTypeLoc>())
+		else if (const clang::TemplateSpecializationTypeLoc TST = T.getAs<clang::TemplateSpecializationTypeLoc>())
 		{
 			if (TST.getNumArgs() >= ArgNum + 1)
 			{
@@ -557,22 +549,23 @@ public:
 		}
 		else
 			Diag(T.getBeginLoc(), diag_warning) << T.getType()->getTypeClassName() << "type as template argument is not supported" << T.getSourceRange();
-		return TemplateArgumentLoc();
+
+		return clang::TemplateArgumentLoc();
 	}
 
-	TemplateArgumentLoc getTemplateArgLocOfBase(const CXXBaseSpecifier *Base, unsigned ArgNum, bool ignore)
+	clang::TemplateArgumentLoc getTemplateArgLocOfBase(const clang::CXXBaseSpecifier *Base, unsigned ArgNum, bool ignore)
 	{
 		return getTemplateArgLoc(Base->getTypeSourceInfo()->getTypeLoc(), ArgNum, ignore);
 	}
 
-	CXXRecordDecl *getTemplateArgDeclOfBase(const CXXBaseSpecifier *Base, unsigned ArgNum, TemplateArgumentLoc &Loc, bool ignore = false)
+	clang::CXXRecordDecl *getTemplateArgDeclOfBase(const clang::CXXBaseSpecifier *Base, unsigned ArgNum, clang::TemplateArgumentLoc &Loc, bool ignore = false)
 	{
 		Loc = getTemplateArgLocOfBase(Base, ArgNum, ignore);
 		switch (Loc.getArgument().getKind())
 		{
-		case TemplateArgument::Type:
+		case clang::TemplateArgument::Type:
 			return Loc.getTypeSourceInfo()->getType()->getAsCXXRecordDecl();
-		case TemplateArgument::Null:
+		case clang::TemplateArgument::Null:
 			// Diag() was already called
 			break;
 		default:
@@ -581,16 +574,16 @@ public:
 		return nullptr;
 	}
 
-	CXXRecordDecl *getTemplateArgDeclOfBase(const CXXBaseSpecifier *Base, unsigned ArgNum, bool ignore = false)
+	clang::CXXRecordDecl *getTemplateArgDeclOfBase(const clang::CXXBaseSpecifier *Base, unsigned ArgNum, bool ignore = false)
 	{
-		TemplateArgumentLoc Loc;
+		clang::TemplateArgumentLoc Loc;
 		return getTemplateArgDeclOfBase(Base, ArgNum, Loc, ignore);
 	}
 
-	void handleSimpleState(CXXRecordDecl *RecordDecl, const CXXBaseSpecifier *Base)
+	void handleSimpleState(clang::CXXRecordDecl *RecordDecl, const clang::CXXBaseSpecifier *Base)
 	{
 		int typedef_num = 0;
-		string name(RecordDecl->getName()); //getQualifiedNameAsString());
+		std::string name(RecordDecl->getName()); //getQualifiedNameAsString());
 		Diag(RecordDecl->getLocStart(), diag_found_state) << name;
 		reactMethodInReactions.clear();
 
@@ -600,7 +593,7 @@ public:
 		if (!(state = model.removeFromUndefinedContexts(name)))
 			state = new Model::State(name);
 
-		CXXRecordDecl *Context = getTemplateArgDeclOfBase(Base, 1);
+		clang::CXXRecordDecl *Context = getTemplateArgDeclOfBase(Base, 1);
 		if (Context)
 		{
 			Model::Context *c = model.findContext(Context->getName());
@@ -613,7 +606,7 @@ public:
 			c->add(state);
 		}
 		//TODO support more innitial states
-		TemplateArgumentLoc Loc;
+		clang::TemplateArgumentLoc Loc;
 		if (MyCXXRecordDecl *InnerInitialState = static_cast<MyCXXRecordDecl*>(getTemplateArgDeclOfBase(Base, 2, Loc, true)))
 		{
 			if (InnerInitialState->isDerivedFrom("boost::statechart::simple_state") || InnerInitialState->isDerivedFrom("boost::statechart::state_machine"))
@@ -627,11 +620,10 @@ public:
 // 	    if (CXXRecordDecl *History = getTemplateArgDecl(Base->getType().getTypePtr(), 3))
 // 		Diag(History->getLocStart(), diag_no_history);
 
-		IdentifierInfo& II = ASTCtx->Idents.get("reactions");
+		clang::IdentifierInfo& II = ASTCtx->Idents.get("reactions");
 		// TODO: Lookup for reactions even in base classes - probably by using Sema::LookupQualifiedName()
-		DeclContext::lookup_result Reactions = RecordDecl->lookup(DeclarationName(&II));
-		DeclContext::lookup_result::iterator it, end;
-		for (it = Reactions.begin(), end = Reactions.end(); it != end; ++it, typedef_num++)
+		clang::DeclContext::lookup_result Reactions = RecordDecl->lookup(clang::DeclarationName(&II));
+		for (clang::DeclContext::lookup_result::iterator it = Reactions.begin(), end = Reactions.end(); it != end; ++it, typedef_num++)
 			HandleReaction(*it, RecordDecl);
 
 		if (typedef_num == 0)
@@ -641,7 +633,7 @@ public:
 		}
 	}
 
-	void handleStateMachine(CXXRecordDecl *RecordDecl, const CXXBaseSpecifier *Base)
+	void handleStateMachine(clang::CXXRecordDecl *RecordDecl, const clang::CXXBaseSpecifier *Base)
 	{
 		Model::Machine m(RecordDecl->getName());
 		Diag(RecordDecl->getLocStart(), diag_found_statemachine) << m.name;
@@ -652,7 +644,7 @@ public:
 		model.add(m);
 	}
 
-	bool VisitCXXRecordDecl(CXXRecordDecl *Declaration)
+	bool VisitCXXRecordDecl(clang::CXXRecordDecl *Declaration)
 	{
 		if (!Declaration->isCompleteDefinition())
 			return true;
@@ -661,7 +653,7 @@ public:
 			return true; // This is an "abstract class" not a real state or real state machine
 
 		MyCXXRecordDecl *RecordDecl = static_cast<MyCXXRecordDecl*>(Declaration);
-		const CXXBaseSpecifier *Base;
+		const clang::CXXBaseSpecifier *Base;
 
 		if (RecordDecl->isDerivedFrom("boost::statechart::simple_state", &Base))
 			handleSimpleState(RecordDecl, Base);
@@ -687,10 +679,10 @@ class VisualizeStatechartConsumer: public clang::ASTConsumer
 {
 	Model::Model model;
 	Visitor visitor;
-	string destFileName;
+	std::string destFileName;
 
 public:
-	explicit VisualizeStatechartConsumer(ASTContext *Context, std::string destFileName, DiagnosticsEngine &D) :
+	explicit VisualizeStatechartConsumer(clang::ASTContext *Context, std::string destFileName, clang::DiagnosticsEngine &D) :
 			visitor(Context, model, D), destFileName(std::move(destFileName))
 	{
 	}
@@ -703,10 +695,10 @@ public:
 	}
 };
 
-class VisualizeStatechartAction: public PluginASTAction
+class VisualizeStatechartAction: public clang::PluginASTAction
 {
 protected:
-	ASTConsumer *CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override
+	clang::ASTConsumer *CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef) override
 	{
 		size_t dot = getCurrentFile().find_last_of('.');
 		std::string dest = getCurrentFile().substr(0, dot);
@@ -714,17 +706,17 @@ protected:
 		return new VisualizeStatechartConsumer(&CI.getASTContext(), dest, CI.getDiagnostics());
 	}
 
-	bool ParseArgs(const CompilerInstance &CI, const std::vector<std::string>& args) override
+	bool ParseArgs(const clang::CompilerInstance &CI, const std::vector<std::string>& args) override
 	{
-		for (unsigned i = 0, e = args.size(); i != e; ++i)
+		for (auto & arg : args)
 		{
-			llvm::errs() << "Visualizer arg = " << args[i] << "\n";
+			llvm::errs() << "Visualizer arg = " << arg << "\n";
 
 			// Example error handling.
-			if (args[i] == "-an-error")
+			if (arg == "-an-error")
 			{
-				DiagnosticsEngine &D = CI.getDiagnostics();
-				unsigned DiagID = D.getDiagnosticIDs()->getCustomDiagID((DiagnosticIDs::Level) DiagnosticsEngine::Error, StringRef("invalid argument '" + args[i] + "'"));
+				clang::DiagnosticsEngine &D = CI.getDiagnostics();
+				unsigned DiagID = D.getDiagnosticIDs()->getCustomDiagID((clang::DiagnosticIDs::Level) clang::DiagnosticsEngine::Error, llvm::StringRef("invalid argument '" + arg + "'"));
 				D.Report(DiagID);
 				return false;
 			}
@@ -742,4 +734,4 @@ protected:
 	}
 };
 
-static FrontendPluginRegistry::Add<VisualizeStatechartAction> X("visualize-statechart", "visualize statechart");
+static clang::FrontendPluginRegistry::Add<VisualizeStatechartAction> X("visualize-statechart", "visualize statechart");
