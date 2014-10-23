@@ -85,7 +85,7 @@ public:
 	const string name;
 
 	explicit State(string name) :
-			noTypedef(false), name(name)
+			noTypedef(false), name(std::move(name))
 	{
 	}
 
@@ -131,7 +131,7 @@ Context *Context::findContext(const string &name)
 			return c;
 	}
 
-	return 0;
+	return nullptr;
 }
 
 ostream& operator<<(ostream& os, const Context& c);
@@ -140,11 +140,11 @@ ostream& operator<<(ostream& os, const State& s)
 {
 	string label = s.name;
 
-	for (list<string>::const_iterator i = s.defferedEvents.begin(), e = s.defferedEvents.end(); i != e; ++i)
-		label.append("<br />").append(*i).append(" / defer");
+	for (const auto & elem : s.defferedEvents)
+		label.append("<br />").append(elem).append(" / defer");
 
-	for (list<string>::const_iterator i = s.inStateEvents.begin(), e = s.inStateEvents.end(); i != e; ++i)
-		label.append("<br />").append(*i).append(" / in state");
+	for (const auto & elem : s.inStateEvents)
+		label.append("<br />").append(elem).append(" / in state");
 
 	if (s.noTypedef)
 		os << indent << s.name << " [label=<" << label << ">, color=\"red\"]\n";
@@ -166,9 +166,9 @@ ostream& operator<<(ostream& os, const State& s)
 
 ostream& operator<<(ostream& os, const Context& c)
 {
-	for (Context::const_iterator i = c.begin(), e = c.end(); i != e; i++)
+	for (const auto & elem : c)
 	{
-		os << *i->second;
+		os << *elem.second;
 	}
 
 	return os;
@@ -180,7 +180,7 @@ public:
 	const string src, dst, event;
 
 	Transition(string src, string dst, string event) :
-			src(src), dst(dst), event(event)
+			src(std::move(src)), dst(std::move(dst)), event(std::move(event))
 	{
 	}
 };
@@ -200,7 +200,7 @@ public:
 	const string name;
 
 	explicit Machine(string name) :
-			name(name)
+			name(std::move(name))
 	{
 	}
 
@@ -241,7 +241,7 @@ public:
 
 	Context *findContext(const string &name)
 	{
-		Context::iterator ci = undefined.find(name);
+		auto ci = undefined.find(name);
 		if (ci != undefined.end())
 			return ci->second;
 
@@ -256,26 +256,26 @@ public:
 				return c;
 		}
 
-		return 0;
+		return nullptr;
 	}
 
 	State *findState(const string &name)
 	{
-		for (iterator i = begin(), e = end(); i != e; ++i)
+		for (auto & elem : *this)
 		{
-			Context *c = i->second.findContext(name);
+			Context *c = elem.second.findContext(name);
 			if (c)
 				return static_cast<State*>(c);
 		}
 
-		return 0;
+		return nullptr;
 	}
 
 	State *removeFromUndefinedContexts(const string &name)
 	{
-		Context::iterator ci = undefined.find(name);
+		auto ci = undefined.find(name);
 		if (ci == undefined.end())
-			return 0;
+			return nullptr;
 		undefined.erase(ci);
 		return ci->second;
 	}
@@ -284,10 +284,10 @@ public:
 	{
 		ofstream f(fn.c_str());
 		f << "digraph statecharts {\n" << indent_inc;
-		for (iterator i = begin(), e = end(); i != e; i++)
-			f << i->second;
-		for (list<Transition*>::iterator t = transitions.begin(), e = transitions.end(); t != e; ++t)
-			f << **t;
+		for (auto & elem : *this)
+			f << elem.second;
+		for (auto & elem : transitions)
+			f << *elem;
 		f << indent_dec << "}\n";
 	}
 };
@@ -306,7 +306,7 @@ class MyCXXRecordDecl: public CXXRecordDecl
 	}
 
 public:
-	bool isDerivedFrom(const char *baseStr, CXXBaseSpecifier const **Base = 0) const
+	bool isDerivedFrom(const char *baseStr, CXXBaseSpecifier const **Base = nullptr) const
 	{
 		CXXBasePaths Paths(/*FindAmbiguities=*/false, /*RecordPaths=*/!!Base, /*DetectVirtual=*/false);
 		Paths.setOrigin(const_cast<MyCXXRecordDecl*>(this));
@@ -364,7 +364,7 @@ class Visitor: public RecursiveASTVisitor<Visitor>
 		SourceLocation loc;
 
 		eventModel(string ev, SourceLocation sourceLoc) :
-				name(ev), loc(sourceLoc)
+				name(std::move(ev)), loc(std::move(sourceLoc))
 		{
 		}
 	};
@@ -374,7 +374,7 @@ class Visitor: public RecursiveASTVisitor<Visitor>
 		string eventName;
 
 		eventHasName(string name) :
-				eventName(name)
+				eventName(std::move(name))
 		{
 		}
 
@@ -512,8 +512,8 @@ public:
 			}
 			else if (name == "boost::mpl::list")
 			{
-				for (TemplateSpecializationType::iterator Arg = TST->begin(), End = TST->end(); Arg != End; ++Arg)
-					HandleReaction(Arg->getAsType().getTypePtr(), Loc, SrcState);
+				for (auto & elem : *TST)
+					HandleReaction(elem.getAsType().getTypePtr(), Loc, SrcState);
 			}
 			else if (name == "boost::statechart::in_state_reaction")
 			{
@@ -578,7 +578,7 @@ public:
 		default:
 			Diag(Loc.getSourceRange().getBegin(), diag_warning) << Loc.getArgument().getKind() << "unsupported kind" << Loc.getSourceRange();
 		}
-		return 0;
+		return nullptr;
 	}
 
 	CXXRecordDecl *getTemplateArgDeclOfBase(const CXXBaseSpecifier *Base, unsigned ArgNum, bool ignore = false)
@@ -678,8 +678,8 @@ public:
 
 	void printUnusedEventDefinitions()
 	{
-		for (list<eventModel>::iterator it = unusedEvents.begin(); it != unusedEvents.end(); it++)
-			Diag((*it).loc, diag_warning) << (*it).name << "event defined but not used in any state";
+		for (auto & elem : unusedEvents)
+			Diag((elem).loc, diag_warning) << (elem).name << "event defined but not used in any state";
 	}
 };
 
@@ -691,11 +691,11 @@ class VisualizeStatechartConsumer: public clang::ASTConsumer
 
 public:
 	explicit VisualizeStatechartConsumer(ASTContext *Context, std::string destFileName, DiagnosticsEngine &D) :
-			visitor(Context, model, D), destFileName(destFileName)
+			visitor(Context, model, D), destFileName(std::move(destFileName))
 	{
 	}
 
-	virtual void HandleTranslationUnit(clang::ASTContext &Context)
+	virtual void HandleTranslationUnit(clang::ASTContext &Context) override
 	{
 		visitor.TraverseDecl(Context.getTranslationUnitDecl());
 		visitor.printUnusedEventDefinitions();
@@ -706,7 +706,7 @@ public:
 class VisualizeStatechartAction: public PluginASTAction
 {
 protected:
-	ASTConsumer *CreateASTConsumer(CompilerInstance &CI, llvm::StringRef)
+	ASTConsumer *CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override
 	{
 		size_t dot = getCurrentFile().find_last_of('.');
 		std::string dest = getCurrentFile().substr(0, dot);
@@ -714,7 +714,7 @@ protected:
 		return new VisualizeStatechartConsumer(&CI.getASTContext(), dest, CI.getDiagnostics());
 	}
 
-	bool ParseArgs(const CompilerInstance &CI, const std::vector<std::string>& args)
+	bool ParseArgs(const CompilerInstance &CI, const std::vector<std::string>& args) override
 	{
 		for (unsigned i = 0, e = args.size(); i != e; ++i)
 		{
