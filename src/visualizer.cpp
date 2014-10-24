@@ -1,4 +1,3 @@
-/** @file */
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 //    This file is part of Boost Statechart Viewer.
@@ -17,23 +16,24 @@
 //    along with Boost Statechart Viewer.  If not, see <http://www.gnu.org/licenses/>.
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-//standard header files
+
 #include <iomanip>
 #include <fstream>
 #include <map>
 #include <vector>
 
-//LLVM Header files
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/raw_os_ostream.h"
+#include "llvm/Support/CommandLine.h"
 
-//clang header files
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
+#include "clang/Tooling/CommonOptionsParser.h"
+#include "clang/Tooling/Tooling.h"
 
 namespace Model
 {
@@ -115,11 +115,11 @@ Context::iterator Context::add(State *state)
 
 Context *Context::findContext(const std::string &name)
 {
-	iterator i = find(name), e;
+	auto i = find(name);
 	if (i != end())
 		return i->second;
 
-	for (auto & elem : *this)
+	for (auto& elem : *this)
 	{
 		Context *c = elem.second->findContext(name);
 		if (c)
@@ -133,7 +133,7 @@ std::ostream& operator<<(std::ostream& os, const Context& c);
 
 std::ostream& operator<<(std::ostream& os, const State& s)
 {
-	std::string label = s.name;
+	auto label = s.name;
 
 	for (const auto & elem : s.defferedEvents)
 		label.append("<br />").append(elem).append(" / defer");
@@ -239,14 +239,13 @@ public:
 		if (ci != undefined.end())
 			return ci->second;
 
-		iterator i = find(name), e;
+		auto i = find(name);
 		if (i != end())
 			return &i->second;
 
-		for (auto & elem : *this)
+		for (auto& elem : *this)
 		{
-			Context *c = elem.second.findContext(name);
-			if (c)
+			if (auto c = elem.second.findContext(name))
 				return c;
 		}
 
@@ -274,14 +273,17 @@ public:
 		return ci->second;
 	}
 
-	void write_as_dot_file(std::string fn)
+	void write_as_dot_file(std::string const& fn)
 	{
-		std::ofstream f(fn.c_str());
+		std::ofstream f(fn);
 		f << "digraph statecharts {\n" << indent_inc;
-		for (auto & elem : *this)
+
+		for (auto& elem : *this)
 			f << elem.second;
-		for (auto & elem : transitions)
+
+		for (auto& elem : transitions)
 			f << *elem;
+
 		f << indent_dec << "}\n";
 	}
 };
@@ -471,7 +473,7 @@ public:
 			HandleReaction(ET->getNamedType().getTypePtr(), Loc, SrcState);
 		else if (const clang::TemplateSpecializationType *TST = clang::dyn_cast<clang::TemplateSpecializationType>(T))
 		{
-			std::string name = TST->getTemplateName().getAsTemplateDecl()->getQualifiedNameAsString();
+			auto name = TST->getTemplateName().getAsTemplateDecl()->getQualifiedNameAsString();
 			if (name == "boost::statechart::transition")
 			{
 				const clang::Type *EventType = TST->getArg(0).getAsType().getTypePtr();
@@ -536,9 +538,9 @@ public:
 
 	clang::TemplateArgumentLoc getTemplateArgLoc(const clang::TypeLoc &T, unsigned ArgNum, bool ignore)
 	{
-		if (const clang::ElaboratedTypeLoc ET = T.getAs<clang::ElaboratedTypeLoc>())
+		if (const auto ET = T.getAs<clang::ElaboratedTypeLoc>())
 			return getTemplateArgLoc(ET.getNamedTypeLoc(), ArgNum, ignore);
-		else if (const clang::TemplateSpecializationTypeLoc TST = T.getAs<clang::TemplateSpecializationTypeLoc>())
+		else if (const auto TST = T.getAs<clang::TemplateSpecializationTypeLoc>())
 		{
 			if (TST.getNumArgs() >= ArgNum + 1)
 			{
@@ -670,68 +672,52 @@ public:
 
 	void printUnusedEventDefinitions()
 	{
-		for (auto & elem : unusedEvents)
+		for (auto& elem : unusedEvents)
 			Diag((elem).loc, diag_warning) << (elem).name << "event defined but not used in any state";
 	}
 };
 
 class VisualizeStatechartConsumer: public clang::ASTConsumer
 {
-	Model::Model model;
-	Visitor visitor;
-	std::string destFileName;
-
 public:
 	explicit VisualizeStatechartConsumer(clang::ASTContext *Context, std::string destFileName, clang::DiagnosticsEngine &D) :
 			visitor(Context, model, D), destFileName(std::move(destFileName))
 	{
 	}
 
-	virtual void HandleTranslationUnit(clang::ASTContext &Context) override
+private:
+	void HandleTranslationUnit(clang::ASTContext &Context) override
 	{
 		visitor.TraverseDecl(Context.getTranslationUnitDecl());
 		visitor.printUnusedEventDefinitions();
 		model.write_as_dot_file(destFileName);
 	}
+
+private:
+	Model::Model model;
+	Visitor visitor;
+	std::string destFileName;
 };
 
-class VisualizeStatechartAction: public clang::PluginASTAction
+class VisualizeStatechartAction: public clang::ASTFrontendAction
 {
-protected:
-	clang::ASTConsumer *CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef) override
+private:
+	clang::ASTConsumer* CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef) override
 	{
-		size_t dot = getCurrentFile().find_last_of('.');
+		auto dot = getCurrentFile().find_last_of('.');
 		std::string dest = getCurrentFile().substr(0, dot);
 		dest.append(".dot");
 		return new VisualizeStatechartConsumer(&CI.getASTContext(), dest, CI.getDiagnostics());
 	}
-
-	bool ParseArgs(const clang::CompilerInstance &CI, const std::vector<std::string>& args) override
-	{
-		for (auto & arg : args)
-		{
-			llvm::errs() << "Visualizer arg = " << arg << "\n";
-
-			// Example error handling.
-			if (arg == "-an-error")
-			{
-				clang::DiagnosticsEngine &D = CI.getDiagnostics();
-				unsigned DiagID = D.getDiagnosticIDs()->getCustomDiagID((clang::DiagnosticIDs::Level) clang::DiagnosticsEngine::Error, llvm::StringRef("invalid argument '" + arg + "'"));
-				D.Report(DiagID);
-				return false;
-			}
-		}
-
-		if (args.size() && args[0] == "help")
-			PrintHelp(llvm::errs());
-
-		return true;
-	}
-
-	void PrintHelp(llvm::raw_ostream& ros)
-	{
-		ros << "Help for Visualize Statechart plugin goes here\n";
-	}
 };
 
-static clang::FrontendPluginRegistry::Add<VisualizeStatechartAction> X("visualize-statechart", "visualize statechart");
+static llvm::cl::OptionCategory visualizer_category("visualize options");
+static llvm::cl::extrahelp common_help(clang::tooling::CommonOptionsParser::HelpMessage);
+
+int main(int argc, const char **argv)
+{
+	using namespace clang::tooling;
+	CommonOptionsParser options_parser(argc, argv, visualizer_category);
+	ClangTool tool(options_parser.getCompilations(), options_parser.getSourcePathList());
+	return tool.run(newFrontendActionFactory<VisualizeStatechartAction>().get());
+}
