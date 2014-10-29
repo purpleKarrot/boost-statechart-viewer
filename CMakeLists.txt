@@ -19,8 +19,15 @@ add_subdirectory(examples)
 
 find_package(LLVM REQUIRED CONFIG)
 
+set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+
 add_executable(boost-statechart-viewer
   src/visualizer.cpp
+  )
+
+set_target_properties(boost-statechart-viewer PROPERTIES
+  LINK_SEARCH_START_STATIC 1
+  LINK_SEARCH_END_STATIC 1
   )
 
 target_compile_options(boost-statechart-viewer PRIVATE
