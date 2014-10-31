@@ -21,10 +21,12 @@
 #include <fstream>
 #include <map>
 #include <vector>
+#include <iostream>
 
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Path.h"
 
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
@@ -275,7 +277,15 @@ public:
 
 	void write_as_dot_file(std::string const& fn)
 	{
+        std::cout << "Writing graph to '" << fn << "'.\n";
+
 		std::ofstream f(fn);
+		if (!f)
+		{
+	        std::cerr << "Failed to write file '" << fn << "'.\n";
+	        std::exit(-1);
+		}
+
 		f << "digraph statecharts {\n" << indent_inc;
 
 		for (auto& elem : *this)
@@ -699,14 +709,17 @@ private:
 	std::string destFileName;
 };
 
+static std::string abs_path;
+
 class VisualizeStatechartAction: public clang::ASTFrontendAction
 {
 private:
 	clang::ASTConsumer* CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef) override
 	{
-		auto dot = getCurrentFile().find_last_of('.');
-		std::string dest = getCurrentFile().substr(0, dot);
-		dest.append(".dot");
+		std::string dest = abs_path;
+		dest += llvm::sys::path::stem(getCurrentFile());
+		dest += ".dot";
+
 		return new VisualizeStatechartConsumer(&CI.getASTContext(), dest, CI.getDiagnostics());
 	}
 };
@@ -717,6 +730,7 @@ static llvm::cl::extrahelp common_help(clang::tooling::CommonOptionsParser::Help
 int main(int argc, const char **argv)
 {
 	using namespace clang::tooling;
+	abs_path = getAbsolutePath("");
 	CommonOptionsParser options_parser(argc, argv, visualizer_category);
 	ClangTool tool(options_parser.getCompilations(), options_parser.getSourcePathList());
 	return tool.run(newFrontendActionFactory<VisualizeStatechartAction>().get());
